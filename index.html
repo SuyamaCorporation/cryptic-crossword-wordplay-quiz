@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>クリプティッククロスワードワードプレイクイズ</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-gray-100 min-h-screen">
+<div class="max-w-2xl mx-auto p-4 py-8">
+  <h1 class="text-2xl font-bold text-center text-violet-400 mb-1">🔤 クリプティッククロスワード</h1>
+  <p class="text-center text-gray-400 text-sm mb-6">アナグラム・隠れ単語・ダブル定義を解け！</p>
+
+  <!-- 進捗 -->
+  <div class="flex justify-between items-center bg-slate-800 rounded-lg p-3 mb-4 text-sm">
+    <span class="text-gray-400">問題: <span id="qNum" class="text-white font-bold">1</span> / <span id="qTotal" class="text-white font-bold">12</span></span>
+    <span id="typeBadge" class="px-3 py-1 rounded-full text-xs font-bold"></span>
+    <span class="text-gray-400">正答: <span id="correctCount" class="text-green-400 font-bold">0</span> 誤答: <span id="wrongCount" class="text-red-400 font-bold">0</span></span>
+  </div>
+
+  <!-- 問題 -->
+  <div class="bg-slate-800 rounded-xl p-6 mb-4 border border-slate-700">
+    <div class="text-xs text-violet-400 font-semibold mb-1 uppercase tracking-widest" id="typeLabel"></div>
+    <p id="clue" class="text-xl font-semibold text-white mb-2 leading-relaxed"></p>
+    <p id="letterHint" class="text-sm text-gray-400"></p>
+  </div>
+
+  <!-- 解説ヒント -->
+  <div id="tipBox" class="hidden bg-blue-900 border border-blue-600 rounded-lg p-3 mb-4 text-sm text-blue-200"></div>
+
+  <!-- 入力 -->
+  <div class="flex gap-2 mb-3">
+    <input id="answerInput" type="text"
+      aria-label="答えを入力"
+      placeholder="答えを入力..."
+      class="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-4 py-3 text-lg uppercase font-mono focus:outline-none focus:border-violet-500 placeholder-gray-500 tracking-widest"
+    />
+    <button id="submitBtn"
+      aria-label="答えを送信"
+      class="bg-violet-600 hover:bg-violet-500 px-6 py-3 rounded-lg font-semibold transition-colors">
+      解答
+    </button>
+  </div>
+
+  <!-- フィードバック -->
+  <div id="feedback" class="hidden rounded-lg p-4 mb-4 text-center font-semibold text-lg"></div>
+
+  <!-- 解説 -->
+  <div id="explanationBox" class="hidden bg-slate-800 border border-slate-600 rounded-lg p-4 mb-4 text-sm">
+    <div class="text-xs text-gray-400 font-semibold mb-1 uppercase tracking-widest">解説</div>
+    <p id="explanationText" class="text-gray-200"></p>
+  </div>
+
+  <div class="flex gap-2 mb-6">
+    <button id="tipBtn"
+      aria-label="ヒントを表示"
+      class="flex-1 bg-blue-800 hover:bg-blue-700 py-2 rounded-lg text-sm font-semibold transition-colors">
+      💡 ヒント
+    </button>
+    <button id="nextBtn"
+      aria-label="次の問題へ"
+      class="hidden flex-1 bg-violet-700 hover:bg-violet-600 py-2 rounded-lg text-sm font-semibold transition-colors">
+      次へ →
+    </button>
+  </div>
+
+  <!-- 正答率グラフ -->
+  <div class="bg-slate-800 rounded-xl p-5 border border-slate-700">
+    <div class="text-sm text-gray-400 mb-3 font-semibold">正答率グラフ</div>
+    <div class="space-y-2" id="typeGraph"></div>
+    <div class="mt-4">
+      <div class="text-xs text-gray-400 mb-1">総合正答率</div>
+      <div class="relative h-5 bg-slate-700 rounded-full overflow-hidden">
+        <div id="totalBar" class="h-full bg-violet-500 transition-all duration-500" style="width:0%"></div>
+        <span id="totalPct" class="absolute inset-0 flex items-center justify-center text-xs font-bold">0%</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 結果画面 -->
+  <div id="resultScreen" class="hidden mt-6 bg-slate-800 rounded-xl p-8 text-center border border-slate-600">
+    <div class="text-5xl mb-4">🎉</div>
+    <div class="text-2xl font-bold text-violet-400 mb-3">全問完了！</div>
+    <div class="text-gray-300 mb-2">正答数: <span id="finalCorrect" class="text-2xl font-bold text-green-400"></span> / 12問</div>
+    <div id="finalRank" class="text-lg mb-6"></div>
+    <button id="restartBtn"
+      aria-label="もう一度プレイ"
+      class="bg-violet-600 hover:bg-violet-500 px-8 py-3 rounded-lg font-semibold transition-colors">
+      もう一度
+    </button>
+  </div>
+</div>
+
+<script>
+function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+const questions = [
+  {
+    type: 'anagram',
+    typeLabel: 'アナグラム',
+    clue: '「LISTEN」の文字を並べ替えると？（同じ意味を持つ英単語）',
+    answer: 'SILENT',
+    letters: '6文字',
+    tip: '全ての文字を使って並べ替えてください。「静かな」という意味です。',
+    explanation: 'LISTEN → SILENT（静かな）。LSTIENを並べ替えると SILENT になります。'
+  },
+  {
+    type: 'anagram',
+    typeLabel: 'アナグラム',
+    clue: '「ASTRONOMER」の文字を並べ替えると「MOON」+何かになる？（天文学者の見るもの）',
+    answer: 'MOON STARER',
+    letters: '10文字（スペースあり）',
+    tip: '「月を見つめる人」という意味のフレーズになります。',
+    explanation: 'ASTRONOMER → MOON STARER（月を見つめる人）。同じ文字でできた皮肉なアナグラム。'
+  },
+  {
+    type: 'anagram',
+    typeLabel: 'アナグラム',
+    clue: '「ORCHESTRA」をアナグラムすると、音楽に関係する別の言葉は？',
+    answer: 'CARTHORSE',
+    letters: '9文字',
+    tip: '馬の一種です。',
+    explanation: 'ORCHESTRA → CARTHORSE（荷馬）。クリプティックでは意外な単語のアナグラムが答えになります。'
+  },
+  {
+    type: 'anagram',
+    typeLabel: 'アナグラム',
+    clue: '「CONVERSATION」をアナグラムすると？（声に関する動詞）',
+    answer: 'VOICES RANT ON',
+    letters: '12文字（スペースあり）',
+    tip: '「声が叫び続ける」というフレーズになります。',
+    explanation: 'CONVERSATION → VOICES RANT ON。会話の本質を皮肉ったアナグラム。'
+  },
+  {
+    type: 'hidden',
+    typeLabel: '隠れ単語',
+    clue: '次の文の中に隠れた動物を見つけろ: "He LPED the dog escape"',
+    answer: 'ELK',
+    letters: '3文字',
+    tip: '文字列を繋げて読むと動物の名前が隠れています。H-E-L-P-E-D',
+    explanation: 'h-ELK-ed → "hELKed" の中に ELK（エルク・ヘラジカ）が隠れています。'
+  },
+  {
+    type: 'hidden',
+    typeLabel: '隠れ単語',
+    clue: '「therAPIST」の中に隠れた職業は？',
+    answer: 'RAPIST',
+    letters: '6文字',
+    tip: '文字列をよく見てください。意外な言葉が隠れています。',
+    explanation: 'the-RAPIST → RAPIST が隠れています。クリプティックでは意図的に不穏な単語を隠す技法があります。'
+  },
+  {
+    type: 'hidden',
+    typeLabel: '隠れ単語',
+    clue: '「SCATHING」の中に隠れた「猫」は？（英語で）',
+    answer: 'CAT',
+    letters: '3文字',
+    tip: 's-CAT-hing の中を見てください。',
+    explanation: 's-CAT-hing → CAT が隠れています。隠れ単語（hidden word）の典型例。'
+  },
+  {
+    type: 'hidden',
+    typeLabel: '隠れ単語',
+    clue: '「ANOTHER」の中に隠れた代名詞は？（英語）',
+    answer: 'OTHER',
+    letters: '5文字',
+    tip: 'an-OTHER → 「もう一方」という意味の代名詞が含まれています。',
+    explanation: 'an-OTHER → OTHER（もう一方）が隠れています。'
+  },
+  {
+    type: 'double-def',
+    typeLabel: 'ダブル定義',
+    clue: '① 犬や猫が飼い主に「する」行為 ② 植物が日光に向かって行う運動 → 共通する英単語は？',
+    answer: 'FOLLOW',
+    letters: '6文字',
+    tip: '犬は主人を「ついてくる」、ヒマワリも太陽を「追う」。',
+    explanation: 'FOLLOW = ①ついてくる（follow the owner）②追う（sunflowers follow the sun）。ダブル定義の典型。'
+  },
+  {
+    type: 'double-def',
+    typeLabel: 'ダブル定義',
+    clue: '① 試験でよい点を取る ② 音楽の音符の数え方 → 共通する英単語は？',
+    answer: 'SCORE',
+    letters: '5文字',
+    tip: '両方とも「数える」「記録する」ニュアンスがあります。',
+    explanation: 'SCORE = ①点数（exam score）②楽譜（music score）。同じ単語が全く異なる文脈で使われる。'
+  },
+  {
+    type: 'double-def',
+    typeLabel: 'ダブル定義',
+    clue: '① 本の一部 ② 木の一部 ③ 銀行の支店 → 共通する英単語は？',
+    answer: 'BRANCH',
+    letters: '6文字',
+    tip: 'これはトリプル定義！3つ全て同じ単語で表せます。',
+    explanation: 'BRANCH = ①章（a branch of knowledge）②枝（tree branch）③支店（bank branch）。'
+  },
+  {
+    type: 'double-def',
+    typeLabel: 'ダブル定義',
+    clue: '① 夜空に輝く ② 映画や舞台の主役 ③ 形状（☆型） → 共通する英単語は？',
+    answer: 'STAR',
+    letters: '4文字',
+    tip: '日本語でも同じ意味で使われます。',
+    explanation: 'STAR = ①星②スター（有名人）③星形。日英共通の多義語の典型例。'
+  }
+];
+
+const typeStats = { anagram: {c:0,t:0}, hidden: {c:0,t:0}, 'double-def': {c:0,t:0} };
+const typeColors = { anagram: 'bg-pink-500', hidden: 'bg-teal-500', 'double-def': 'bg-orange-500' };
+const typeLabelColors = { anagram: 'bg-pink-800 text-pink-200', hidden: 'bg-teal-800 text-teal-200', 'double-def': 'bg-orange-800 text-orange-200' };
+
+let current = 0;
+let correctCount = 0;
+let wrongCount = 0;
+let answered = false;
+
+function renderQ() {
+  const q = questions[current];
+  document.getElementById('qNum').textContent = current + 1;
+  document.getElementById('clue').textContent = q.clue;
+  document.getElementById('letterHint').textContent = `文字数: ${q.letters}`;
+  document.getElementById('typeLabel').textContent = q.typeLabel;
+  const badge = document.getElementById('typeBadge');
+  badge.textContent = q.typeLabel;
+  badge.className = `px-3 py-1 rounded-full text-xs font-bold ${typeLabelColors[q.type]}`;
+  document.getElementById('tipBox').classList.add('hidden');
+  document.getElementById('feedback').classList.add('hidden');
+  document.getElementById('explanationBox').classList.add('hidden');
+  document.getElementById('nextBtn').classList.add('hidden');
+  document.getElementById('answerInput').value = '';
+  document.getElementById('answerInput').disabled = false;
+  document.getElementById('submitBtn').disabled = false;
+  answered = false;
+}
+
+function updateGraph() {
+  const total = correctCount + wrongCount;
+  const pct = total === 0 ? 0 : Math.round(correctCount / total * 100);
+  document.getElementById('totalBar').style.width = pct + '%';
+  document.getElementById('totalPct').textContent = pct + '%';
+
+  const graphEl = document.getElementById('typeGraph');
+  graphEl.innerHTML = '';
+  for (const [type, stat] of Object.entries(typeStats)) {
+    if (stat.t === 0) continue;
+    const p = Math.round(stat.c / stat.t * 100);
+    const labels = { anagram: 'アナグラム', hidden: '隠れ単語', 'double-def': 'ダブル定義' };
+    const div = document.createElement('div');
+    div.innerHTML = `
+      <div class="flex items-center gap-2 text-xs text-gray-400 mb-1">
+        <span class="w-24 shrink-0">${escHtml(labels[type])}</span>
+        <span class="shrink-0">${stat.c}/${stat.t}</span>
+      </div>
+      <div class="relative h-4 bg-slate-700 rounded-full overflow-hidden">
+        <div class="h-full ${typeColors[type]} transition-all duration-500" style="width:${p}%"></div>
+        <span class="absolute inset-0 flex items-center justify-center text-xs font-bold">${p}%</span>
+      </div>`;
+    graphEl.appendChild(div);
+  }
+}
+
+document.getElementById('submitBtn').addEventListener('click', () => {
+  if (answered) return;
+  const q = questions[current];
+  const userAns = document.getElementById('answerInput').value.trim().toUpperCase().replace(/\s+/g, ' ');
+  const correctAns = q.answer.toUpperCase();
+  answered = true;
+  document.getElementById('answerInput').disabled = true;
+  document.getElementById('submitBtn').disabled = true;
+
+  typeStats[q.type].t++;
+
+  const fb = document.getElementById('feedback');
+  fb.classList.remove('hidden');
+  if (userAns === correctAns) {
+    fb.className = 'rounded-lg p-4 mb-4 text-center font-semibold text-lg bg-green-900 border border-green-600 text-green-200';
+    fb.textContent = '✅ 正解！ 素晴らしい！';
+    correctCount++;
+    typeStats[q.type].c++;
+    document.getElementById('correctCount').textContent = correctCount;
+  } else {
+    fb.className = 'rounded-lg p-4 mb-4 text-center font-semibold text-lg bg-red-900 border border-red-600 text-red-200';
+    fb.textContent = `❌ 不正解。正解: ${escHtml(q.answer)}`;
+    wrongCount++;
+    document.getElementById('wrongCount').textContent = wrongCount;
+  }
+
+  document.getElementById('explanationText').textContent = q.explanation;
+  document.getElementById('explanationBox').classList.remove('hidden');
+  document.getElementById('nextBtn').classList.remove('hidden');
+  updateGraph();
+});
+
+document.getElementById('answerInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('submitBtn').click();
+});
+
+document.getElementById('tipBtn').addEventListener('click', () => {
+  const q = questions[current];
+  const box = document.getElementById('tipBox');
+  box.textContent = q.tip;
+  box.classList.remove('hidden');
+});
+
+document.getElementById('nextBtn').addEventListener('click', () => {
+  current++;
+  if (current >= questions.length) {
+    showResult();
+  } else {
+    renderQ();
+  }
+});
+
+function showResult() {
+  document.getElementById('resultScreen').classList.remove('hidden');
+  document.getElementById('finalCorrect').textContent = correctCount;
+  const ranks = [
+    { min: 10, label: '🏆 クリプティック名人！パーフェクトに近い！' },
+    { min: 7, label: '🥈 ワードプレイの才能あり！' },
+    { min: 4, label: '🥉 半分クリア！もう少し！' },
+    { min: 0, label: '🌱 練習あるのみ！また挑戦！' }
+  ];
+  for (const r of ranks) {
+    if (correctCount >= r.min) {
+      document.getElementById('finalRank').textContent = r.label;
+      break;
+    }
+  }
+}
+
+document.getElementById('restartBtn').addEventListener('click', () => {
+  current = 0; correctCount = 0; wrongCount = 0;
+  for (const k in typeStats) { typeStats[k].c = 0; typeStats[k].t = 0; }
+  document.getElementById('correctCount').textContent = 0;
+  document.getElementById('wrongCount').textContent = 0;
+  document.getElementById('resultScreen').classList.add('hidden');
+  updateGraph();
+  renderQ();
+});
+
+renderQ();
+updateGraph();
+</script>
+</body>
+</html>
